@@ -11,11 +11,8 @@ const readlineSync = require('readline-sync')
 // m/44'/501'/1'/0'
 // m/44'/501'/2'/0'
 
-// TODO: use same path and increase account_index to find specified prefix and suffix
-
-const generateWallet = async () => {
-  const path = "m/44'/501'/0'/0'"
-  const mnemonic = bip39.generateMnemonic(256)
+const generateWallet = async (mnemonic, accountIndex) => {
+  const path = `m/44'/501'/${accountIndex}'/0'`
   const seed = derivePath(path, bip39.mnemonicToSeedSync(mnemonic)).key
   const secretKey = nacl.sign.keyPair.fromSeed(seed).secretKey
   const account = Keypair.fromSecretKey(secretKey)
@@ -28,22 +25,43 @@ const generateWallet = async () => {
   }
 }
 
-const findSpecificWallet = async (prefix) => {
+const findSpecificWallet = async (prefix, suffix, isCaseSensitive, isUseSameMnemonic) => {
   let count = 0
+  let mnemonic = bip39.generateMnemonic(256)
+  let accountIndex = 0
+
   while (true) {
     count++
-    const { address, privateKey, mnemonic, path } = await generateWallet()
-    if (address.slice(0, prefix.length) === prefix) {
+    if (isUseSameMnemonic) {
+      accountIndex = count
+    } else {
+      mnemonic = bip39.generateMnemonic(256)
+    }
+
+    const { address, privateKey, path } = await generateWallet(mnemonic, accountIndex)
+    const prefixAddress = address.slice(0, prefix.length)
+    const suffixAddress = address.slice(address.length - suffix.length)
+
+    let isMatch = false
+    if (isCaseSensitive) {
+      isMatch = prefixAddress === prefix && suffixAddress === suffix
+    } else {
+      isMatch =
+        prefixAddress.toUpperCase() === prefix.toUpperCase() &&
+        suffixAddress.toUpperCase() === suffix.toUpperCase()
+    }
+
+    if (isMatch) {
+      process.stdout.write('\n')
+      console.log('--------------->')
       console.log('Address:', address)
-      console.log('PrivateKey:', privateKey)
+      console.log('Private Key:', privateKey)
       console.log('Mnemonic(24):', mnemonic)
       console.log('Path:', path)
       console.log('--------------->')
-
       break
-    } else {
-      // if (count % 100 !== 0) process.stdout.write('*')
     }
+    if (count % 100 === 0) process.stdout.write('*')
   }
 }
 
@@ -56,5 +74,11 @@ console.log(`
 `)
 
 const prefix = readlineSync.question('[?] prefix: ')
-console.log('--------------->')
-findSpecificWallet(prefix)
+const suffix = readlineSync.question('[?] suffix: ')
+const isCaseSensitive = readlineSync.question('[Y/N]: case sensitive?(N): ') === 'Y'
+const isUseSameMnemonic = readlineSync.question('[Y/N]: use same mnemonic?(N): ') === 'Y'
+
+console.log(
+  `prefix: ${prefix}, suffix: ${suffix}, isCaseSensitive: ${isCaseSensitive}, isUseSameMnemonic: ${isUseSameMnemonic}`
+)
+findSpecificWallet(prefix, suffix, isCaseSensitive, isUseSameMnemonic)
