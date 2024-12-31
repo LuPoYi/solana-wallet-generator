@@ -1,5 +1,10 @@
 # solana-wallet-generator
 
+```zsh
+yarn
+yarn start
+```
+
 Custom prefix & suffix solana address generator
 
 - support custom prefix and suffix
